@@ -1,47 +1,36 @@
 use crate::repository::Artifact;
-use url::{Url, ParseError};
+use serde::Deserialize;
 
-/// Represents a remote repository. This struct is used to 
-/// fetch artifacts from the mentioned remote repository.
-///
-/// * Local repository: [`crate::repository::Repository`]
-pub struct RemoteRepository {
-    pub remote_url: Url
+#[derive(Deserialize)]
+#[serde(rename = "project")]
+struct Project {
+    pub dependencies: Dependencies 
 }
 
-// https://repo1.maven.org/maven2/org/junit/jupiter/junit-jupiter-api/5.10.2/junit-jupiter-api-5.10.2.jar
-
-impl Default for RemoteRepository {
-    fn default() -> Self {
-        Self {
-            remote_url: Url::parse("https://repo1.maven.org/").unwrap()
-        }
-    }
+#[derive(Deserialize)]
+#[serde(rename = "dependencies")]
+struct Dependencies {
+    #[serde(rename = "dependency")]
+    pub artifacts: Vec<Artifact>
 }
 
-impl RemoteRepository {
-    /// Base URL of the artifact (*it doesn't contain the '.jar', '.pom' etc... extension
-    /// of the file to download*).
-    fn artifact_url(&self, artifact: &Artifact) -> Result<Url, ParseError> {
-        //self.remote_url
-        let segmented_group_id = artifact.group_id.split(".")
-            .collect::<Vec<&str>>();
-        let mut remote_url = self.remote_url.clone();
-        
-        remote_url = remote_url.join("maven2")?;
-        segmented_group_id.iter()
-            .try_fold(remote_url, |url, segment| url.join(segment))
-    }
+/// Parses the given contents of the pom.xml file, and returns a `Vec<Artifact>` containing all of
+/// the dependencies if there were no errors while parsing.
+pub fn dependencies_in_pom<T: AsRef<str>>(pom_contents: T) -> Result<Vec<Artifact>, serde_xml_rs::Error> {
+    Ok(
+        serde_xml_rs::from_str::<Project>(trim_xml_file(pom_contents.as_ref()))?
+            .dependencies.artifacts
+    )
+}
 
-    /// Generates the URL of the given artifact's jar.
-    pub fn jar_artifact_url(&self, artifact: &Artifact) -> Result<Url, ParseError> {
-        let base_artifact_url = self.artifact_url(artifact)?;
-        Url::parse(&(base_artifact_url.to_string() + ".jar"))
-    }
-
-    /// Generates the URL of the given artifact's pom.
-    pub fn pom_artifact_url(&self, artifact: &Artifact) -> Result<Url, ParseError> {
-        let base_artifact_url = self.artifact_url(artifact)?;
-        Url::parse(&(base_artifact_url.to_string() + ".pom.xml"))
+/// Removes the first line of xml (*the XML declaration*), making it
+/// parseable for `serde_xml_rs`. If the line doesn't start with '<?xml...', 
+/// this first line won't be trimmed, and the original contents passed will be returned.
+fn trim_xml_file(pom_contents: &str) -> &str {
+    let pom_contents_t = pom_contents.trim_start();
+    if pom_contents_t.starts_with("<?xml") {
+        pom_contents_t.split_once("\n").unwrap_or_default().1
+    } else {
+        pom_contents
     }
 }
