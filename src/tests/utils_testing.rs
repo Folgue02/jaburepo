@@ -52,8 +52,11 @@ fn testing_dependencies_from_pom() {
             artifact_id: "junit-jupiter".to_string(),
             group_id: "org.junit.jupiter".to_string(),
             version: "5.10.0".to_string(),
-        }
+        },
     ];
 
-    assert_eq!(expected, crate::utils::dependencies_in_pom(SAMPLE_VALID_POM).unwrap())
+    assert_eq!(
+        expected,
+        crate::utils::dependencies_in_pom(SAMPLE_VALID_POM).unwrap()
+    )
 }
